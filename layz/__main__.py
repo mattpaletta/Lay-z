@@ -27,6 +27,7 @@ if __name__ == "__main__":
             .replace("\t", " ") \
             .replace("\n", " ") \
             .split(" ")
+
         parsed = parser.parse(query)
         is_valid = validator.is_valid_query(query=parsed)
         if is_valid:

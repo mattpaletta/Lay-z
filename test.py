@@ -1,5 +1,4 @@
 from layz.Dataframe import Dataframe
-from layz.core import Core
 
 
 def common_friends_example():
