@@ -1,0 +1,12 @@
+- data is paged.
+- data being read from disk/network is streamed/paged
+- a function is hashed to determine the next executor.
+- 1 master node stores an array index of child nodes, the hash points to a particular child node. (Round robin, random, LRU, etc.)
+
+
+Problomatic functions:
+- count() - sum of the internal counts?
+- collect()
+- group by - aggregate on each worker?
+- joins... - stream in new table, join it to current table. (only those joined, on last page, send everything else)
+- cartesian - do join with itself.
