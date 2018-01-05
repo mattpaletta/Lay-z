@@ -81,14 +81,16 @@ class Parser(object):
         return processed
 
     def handle_create(self, query):
-        create: CREATE = None
+        to_create = None
         for index, word in enumerate(query):
             if word.lower() == "table":
                 # return a create table.
-                create = self.handle_create_table(query[index:])
+                to_create = self.handle_create_table(query[index:])
             elif word.lower() == "schema":
                 # return a create schema.
-                create = self.handle_create_schema(query[index:])
+                to_create = self.handle_create_schema(query[index:])
+
+        create = CREATE(to_create)
 
         return create
 
@@ -115,6 +117,7 @@ class Parser(object):
     def handle_create_schema(self, query):
         schma = SCHEMA()
         schma.set_name(query[0])
+
         return schma
 
     def handle_select(self, query):

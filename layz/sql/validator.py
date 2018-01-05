@@ -1,6 +1,6 @@
 import os
 
-from parser import SELECT, TABLE, COLUMN, INSERT, CREATE, SCHEMA
+from sql.parser import SELECT, TABLE, COLUMN, INSERT, CREATE, SCHEMA
 
 
 class Validator(object):
@@ -30,11 +30,11 @@ class Validator(object):
                 is_valid = is_valid and self.is_valid_query(select.columns)
                 is_valid = is_valid and self.is_valid_query([select.tbl])
 
-            if type(item) == INSERT:
+            elif type(item) == INSERT:
                 insert: INSERT = item
                 is_valid = is_valid and self.is_valid_query([insert])
 
-            if type(item) == CREATE:
+            elif type(item) == CREATE:
                 create: CREATE = item
 
                 if type(create.obj) == TABLE:
@@ -45,16 +45,23 @@ class Validator(object):
                     schma: SCHEMA = create.obj
                     is_valid = is_valid and not self.is_valid_query([schma])
 
-            if type(item) == COLUMN:
+            elif type(item) == COLUMN:
                 col: COLUMN = item
                 is_valid = is_valid and col.name is not "" and col.name is not None
                 is_valid = is_valid and col.var_type in \
                            ["str", "int", "float", "long", "bool"]  # check for supported types.
 
-            if type(item) == TABLE:
+            elif type(item) == TABLE:
                 tbl: TABLE = item
                 # check that the table exists.
                 is_valid = is_valid and os.path.exists(tbl.get_path())
+
+            elif type(item) == SCHEMA:
+                schma: SCHEMA = item
+                is_valid = is_valid and os.path.exists(schma.get_path())
+
+            else:
+                print("Warning! Invalid type in validation!")
 
         return is_valid
 
@@ -63,6 +70,7 @@ class Validator(object):
     def fill_in_query(self, query):
         print("TODO! Expand query")
 
+        """
         for item in query:
             if type(item) == SELECT:
                 select: SELECT = item
@@ -70,5 +78,5 @@ class Validator(object):
                 for column in select.columns:
                     if column.get_name() == "*":  # later maybe be regex?
                         pass
-
+        """
         return query

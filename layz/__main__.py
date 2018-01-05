@@ -8,14 +8,16 @@ WHERE arank > 8.5 AND avotes > 1000 GROUP BY episodeof)
 SELECT * FROM productions NATURAL JOIN showEpisodes WHERE attr=‘TV-Show’;
 
 """
-from parser import Parser
+from sql.executor import Executor
+from sql.parser import Parser
 
 # Return create objects.
-from validator import Validator
+from sql.validator import Validator
 
 if __name__ == "__main__":
     parser = Parser()
     validator = Validator()
+    executor = Executor()
     while True:
         query = input(">> ")
         if query == "exit" or query == "quit":
@@ -29,7 +31,9 @@ if __name__ == "__main__":
         is_valid = validator.is_valid_query(query=parsed)
         if is_valid:
             full = validator.fill_in_query(query=parsed)
+
+            print("Running query!")
+            executor.generate(full)
+
         else:
             print("Invalid query!")
-
-        print(is_valid)
