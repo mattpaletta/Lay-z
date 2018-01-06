@@ -1,8 +1,11 @@
 import itertools
 import parquet
 import csv
-import copy
 import logging
+
+from Row import Row
+from RowManager import RowManager
+
 
 def is_iterator(obj):
     if (
@@ -26,75 +29,6 @@ def isEmpty (iterable):
 def INTERSECT(a: list, b: list):
     filtered = filter(lambda x: (x[0] in b and x[1] in a), zip(a, b))
     return map(lambda x: x[0], filtered)  # flatmap it...
-
-class Row(object):
-
-    def __init__(self, data={}):
-        self.data = data
-
-    def get_as_dict(self):
-        return self.data
-
-    def get_as_list(self):
-        return list(self.data.values())
-
-    def get(self, column):
-        if column in self.data.keys():
-            return self.data[column]
-        else:
-            return None
-
-    @property
-    def columns(self):
-        return self.data.keys()
-
-
-class RowManager(object):
-    _internal_rows: [Row]
-    _external_rows: [Row]
-    index = 0
-    func = None
-
-    def __init__(self):
-        self._internal_rows = []
-        self._external_rows = []
-        self.index = 0
-        self.func = lambda x: x
-
-    def add_row(self, data: {str, any}):
-        row = Row(data)
-        self._internal_rows.append(row)
-
-    def set_internal_rows(self, rows):
-        self._internal_rows = rows
-
-    def get_internal_rows(self):
-        return copy.deepcopy(self._internal_rows)
-
-    def __getitem__(self, index):
-        self.index = index
-        return self.__next__()
-
-    def __next__(self):
-        # pagination...
-
-        # TODO:// handle cases when a function operates on a single level...
-        # TODO:// They may still be computing!
-
-        # get next page!
-        if self.index >= len(self._external_rows):
-            gen = self.func(self._internal_rows)
-            self._internal_rows = []
-            if is_iterator(gen) or type(gen) == list:
-                for row in gen:
-                    self._external_rows.append(row)
-            else:
-                # not an iterator, must be a row.
-                self._external_rows.append(gen)
-
-        to_ret = self._external_rows[self.index]
-        return to_ret
-
 
 class Dataframe(object):
     row_manager: RowManager
