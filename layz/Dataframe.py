@@ -2,6 +2,7 @@ import itertools
 import parquet
 import csv
 import copy
+import logging
 
 def is_iterator(obj):
     if (
@@ -30,6 +31,12 @@ class Row(object):
 
     def __init__(self, data={}):
         self.data = data
+
+    def get_as_dict(self):
+        return self.data
+
+    def get_as_list(self):
+        return list(self.data.values())
 
     def get(self, column):
         if column in self.data.keys():
@@ -71,7 +78,8 @@ class RowManager(object):
     def __next__(self):
         # pagination...
 
-        # if we ran out of external rows, compute more and add them.
+        # TODO:// handle cases when a function operates on a single level...
+        # TODO:// They may still be computing!
 
         # get next page!
         if self.index >= len(self._external_rows):
@@ -80,7 +88,6 @@ class RowManager(object):
             if is_iterator(gen) or type(gen) == list:
                 for row in gen:
                     self._external_rows.append(row)
-                    yield self._external_rows[self.index]
             else:
                 # not an iterator, must be a row.
                 self._external_rows.append(gen)
@@ -96,11 +103,57 @@ class Dataframe(object):
         self.row_manager = RowManager()
         self.row_manager.func = func
 
+    def __repr__(self):
+        self.row_manager.index = 0 # reset pointer...
+        rows = list(self.get_rows()) # evaluate this!
+
+        keys = []
+        for row in rows:
+            keys.extend(row.columns)
+        keys = list(sorted(set(keys)))
+
+        longest_rows = {}
+
+        for col in keys:
+            # find the longest data point in that row...
+            this_col_len = []
+            for row in rows:
+                this_col_len.append(len(str(row.get(col))))
+
+            longest_rows.update({col: max(this_col_len)})
+
+        print_str_header: str = ""
+
+        for col in keys:
+            print_str_header += '{:<' + str(longest_rows[col]) + '} | '
+
+        print(print_str_header.format(*keys))
+        print('-' * len(print_str_header.format(*keys)))
+
+        for row in rows:
+            print_str: str = ""
+
+            items = []
+
+            for col in keys:
+                print_str += "{:<" + str(longest_rows[col]) + "} | "
+                items.append(str(row.get(col)))
+
+            print(print_str.format(*items))
+
+        return ""
+
     def add_row(self, data: {str, any}):
         self.row_manager.add_row(data)
 
     def get_rows(self):
         return self.row_manager
+
+    def to_list(self):
+        rows = []
+        for row in self.row_manager:
+            rows.append(row.get_as_dict())
+        return rows
 
     def read_data_multiple(self, files: [str]):
         for file in files:
@@ -110,9 +163,9 @@ class Dataframe(object):
         if file.endswith("parquet"):
             # turn into dataframe _internal_rows.
             for row in self.read_parquet(file):
+                # make the conversion from parquet to Row()
+                pass
                 print(row)
-
-                self.rows.append(Row())
 
         if file.endswith("csv"):
             for row in self.read_csv(file):
@@ -135,23 +188,14 @@ class Dataframe(object):
                 yield row
 
     def explode_dict(self, me_col, friends_col):
-        """
-        for row in self.get_rows():
-            me = row.get(me_col)
-            my_friends = row.get(friends_col)
-            for my_friend in my_friends:
-                print("explode")
-
-                yield Row({me_col: sorted([me, my_friend]), friends_col: sorted(my_friends)})
-        """
 
         def f(rows):
-            print("ex")
+            logging.debug("Explode Looping over rows!")
             for row in rows:
                 me = row.get(me_col)
                 my_friends = row.get(friends_col)
                 for my_friend in my_friends:
-                    print("explode")
+                    logging.debug("Exploding!" + str(my_friends))
                     yield Row({me_col: sorted([me, my_friend]), friends_col: sorted(my_friends)})
 
         df = Dataframe(f)
@@ -167,7 +211,7 @@ class Dataframe(object):
                 key = tuple(row.get(me_col))
                 value = row.get(friends_col)
 
-                print("group by")
+                logging.debug("Grouping by: " + str(key))
                 if key in seen_friends.keys():
                     current_friends: list = seen_friends[key]
                     current_friends.append(value)
@@ -198,7 +242,7 @@ class Dataframe(object):
                     for i in value[1:]:
                         intersection = INTERSECT(list(intersection), i)
 
-                print("finding common")
+                logging.debug("Finding Common friends for: " + str(key))
                 yield Row({me_col: key, friends_col: list(intersection)})
 
         df = Dataframe(f)
@@ -209,9 +253,9 @@ class Dataframe(object):
 
         def f(rows):
             index = 0
-            print("lim")
+            logging.debug("Getting Rows")
             for item in rows:
-                print("limit")
+                logging.debug("Reached Limit!")
                 index += 1
                 yield item
 

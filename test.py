@@ -1,3 +1,7 @@
+import logging
+
+import sys
+
 from layz.Dataframe import Dataframe
 
 
@@ -15,15 +19,23 @@ def common_friends_example():
         row = {"me": key, "friends": value}
         df.add_row(row)
 
-    df2 = df.explode_dict(me_col="me", friends_col="friends").limit(10)
-    #df3 = df2.group_by_key(me_col="me", friends_col="friends")
-    #df4 = df3.find_common_friends(me_col="me", friends_col="friends")\
-    #.limit(10)
+    df2 = df.explode_dict(me_col="me", friends_col="friends")\
+        .group_by_key(me_col="me", friends_col="friends")\
+        .find_common_friends(me_col="me", friends_col="friends")\
+        .limit(100)
 
-    print(list(df.row_manager))
-    print(list(df2.row_manager))
+    print(df2)
 
     print("Done!")
 
 if __name__ == "__main__":
+    root = logging.getLogger()
+    root.setLevel(logging.NOTSET)
+
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.NOTSET)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s - [%(filename)s:%(lineno)s]')
+    ch.setFormatter(formatter)
+    root.addHandler(ch)
+
     common_friends_example()
