@@ -15,7 +15,8 @@ def common_friends_example():
         row = {"me": key, "friends": value}
         df.add_row(row)
 
-    print(df.rows)
+    df2 = df.explode_dict(me_col="me", friends_col="friends")
+    print(list(df.row_manager))
 
 
 if __name__ == "__main__":

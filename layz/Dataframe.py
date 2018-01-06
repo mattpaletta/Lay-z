@@ -1,11 +1,11 @@
+from time import sleep
+
 import parquet
 import csv
 
 class Row(object):
-    def __init(self):
-        self.data = {}
 
-    def __init__(self, data):
+    def __init__(self, data={}):
         self.data = data
 
     def get(self, column):
@@ -21,32 +21,43 @@ class Row(object):
 
 class RowManager(object):
     rows: [Row]
+    index = 0
+    func = None
 
     def __init__(self):
         self.rows = []
+        self.index = 0
+        self.func = lambda x: x
 
     def add_row(self, data: {str, any}):
         row = Row(data)
         self.rows.append(row)
 
+    def __getitem__(self, index):
+        self.index = index
+        return self.__next__()
+
     def __next__(self):
         # pagination...
-
-
-
-
+        # Todo: Fetch rows from previous function.
+        #sleep(0.01)
+        item = self.rows[self.index]
+        self.index = (self.index + 1) #% len(self.rows)  # loop over rows, for now
+        print(item, self.index, self.func(item))
+        for row in self.func(item):
+            yield row
 
 class Dataframe(object):
     row_manager: RowManager
-
-    def __init__(self):
+    def __init__(self, func = lambda x: x):
         self.row_manager = RowManager()
+        self.row_manager.func = func
 
     def add_row(self, data: {str, any}):
         self.row_manager.add_row(data)
 
     def get_rows(self):
-        for row in self.rows:
+        for row in self.row_manager:
             yield row
 
     def read_data_multiple(self, files: [str]):
@@ -92,7 +103,15 @@ class Dataframe(object):
                 yield Row({me_col: sorted([me, my_friend]), friends_col: sorted(my_friends)})
         """
 
-        def f(iterator):
-            return
+        def f():
+            for row in self.row_manager:
+                me = row.get(me_col)
+                my_friends = row.get(friends_col)
+                for my_friend in my_friends:
+                    print("explode")
 
-        return self  # pointer to current dataframe.
+                    yield Row({me_col: sorted([me, my_friend]), friends_col: sorted(my_friends)})
+        df = Dataframe(f)
+        df.row_manager = self.row_manager
+
+        return df  # pointer to current dataframe.
