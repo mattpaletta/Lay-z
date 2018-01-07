@@ -15,6 +15,12 @@ class Row(object):
         else:
             return None
 
+    def get_as_str(self, column):
+        return str(self.get(column))
+
+    def get_as_int(self, column):
+        return int(self.get(column))
+
     @property
     def columns(self):
         return self.data.keys()

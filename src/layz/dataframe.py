@@ -91,29 +91,49 @@ class Dataframe(object):
     def read_data(self, file: str):
         if file.endswith("parquet"):
             # turn into dataframe _internal_rows.
-            for row in self.read_parquet(file):
+            for row in self.__read_parquet(file):
                 # make the conversion from parquet to Row()
                 print(row)
 
-        if file.endswith("csv"):
-            for row in self.read_csv(file):
+        elif file.endswith("csv"):
+            for row in self.__read_csv(file):
                 print(row)
 
-    def read_parquet_multiple(self, files):
+    def __read_parquet_multiple(self, files):
         for file in files:
-            for row in self.read_parquet(file):
+            for row in self.__read_parquet(file):
                 yield row
 
-    def read_parquet(self, file):
+    def __read_parquet(self, file):
         with open(file) as fo:
             for row in parquet.reader(fo):
                 yield row
 
-    def read_csv(self, file):
+    def __read_csv(self, file):
         with open(file, 'rb') as csvfile:
             csvreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
             for row in csvreader:
                 yield row
+
+    def read_txt(self, file_name, col_name):
+        def f(iterator):
+            logging.debug("Reading lines!")
+            with open(file_name, "r") as txtfile:
+                for line in txtfile:
+                    yield Row({col_name: line})
+
+                yield StopIteration
+
+        return self.map_using(f)
+
+
+    def map_row(self, func):
+        def f(rows):
+            for row in rows:
+                yield func(row)
+
+        return self.map_using(f)
+
 
     def map_using(self, func):
         # Return a new dataframe where the input rows of the dataframe
