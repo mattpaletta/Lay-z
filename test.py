@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from layz.Dataframe import Dataframe
+from src.layz import Dataframe
 
 
 def common_friends_example():

@@ -3,43 +3,38 @@ import parquet
 import csv
 import logging
 
-from Row import Row
-from RowManager import RowManager
+from layz.row import Row
+from layz.row_manager import RowManager
 
 
-def is_iterator(obj):
-    if (
-            hasattr(obj, '__iter__') and
-            (hasattr(obj, 'next') or hasattr(obj, "__next__")) and      # or __next__ in Python 3
-            callable(obj.__iter__) and
-            obj.__iter__() is obj
-        ):
-        return True
-    else:
-        return False
-
-def isEmpty (iterable):
-    my_iter = itertools.islice (iterable, 0)
+def isEmpty(iterable):
+    my_iter = itertools.islice(iterable, 0)
     try:
         my_iter.next()
     except StopIteration:
-         return True
+        return True
     return False
+
 
 def INTERSECT(a: list, b: list):
     filtered = filter(lambda x: (x[0] in b and x[1] in a), zip(a, b))
     return map(lambda x: x[0], filtered)  # flatmap it...
 
+
 class Dataframe(object):
     row_manager: RowManager
 
-    def __init__(self, func):
+    def __init__(self, func=None):
         self.row_manager = RowManager()
-        self.row_manager.func = func
+        if func is None:
+            # default to the identity function
+            self.row_manager.func = lambda x: x
+        else:
+            self.row_manager.func = func
 
     def __repr__(self):
-        self.row_manager.index = 0 # reset pointer...
-        rows = list(self.get_rows()) # evaluate this!
+        self.row_manager.index = 0  # reset pointer...
+        rows = list(self.get_rows())  # evaluate this!
 
         keys = []
         for row in rows:
@@ -98,7 +93,6 @@ class Dataframe(object):
             # turn into dataframe _internal_rows.
             for row in self.read_parquet(file):
                 # make the conversion from parquet to Row()
-                pass
                 print(row)
 
         if file.endswith("csv"):
@@ -121,70 +115,50 @@ class Dataframe(object):
             for row in csvreader:
                 yield row
 
-    def explode_dict(self, me_col, friends_col):
-
-        def f(rows):
-            logging.debug("Explode Looping over rows!")
-            for row in rows:
-                me = row.get(me_col)
-                my_friends = row.get(friends_col)
-                for my_friend in my_friends:
-                    logging.debug("Exploding!" + str(my_friends))
-                    yield Row({me_col: sorted([me, my_friend]), friends_col: sorted(my_friends)})
-
-        df = Dataframe(f)
-        df.row_manager._internal_rows = self.row_manager
-
-        return df  # pointer to current dataframe.
-
-    def group_by_key(self, me_col, friends_col):
-        def f(rows):
-            # here we have to loop over all the items :(
-            seen_friends = {}
-            for row in rows:
-                key = tuple(row.get(me_col))
-                value = row.get(friends_col)
-
-                logging.debug("Grouping by: " + str(key))
-                if key in seen_friends.keys():
-                    current_friends: list = seen_friends[key]
-                    current_friends.append(value)
-                else:
-                    seen_friends.update({key: [value]})
-
-            for key, value in seen_friends.items():
-                yield Row({me_col: key, friends_col: value})
-
-        df = Dataframe(f)
+    def map_using(self, func):
+        # Return a new dataframe where the input rows of the dataframe
+        # are the output of this dataframe. (after self.func is applied to each row.)
+        df = Dataframe(func)
         df.row_manager._internal_rows = self.row_manager
 
         return df
 
-    def find_common_friends(self, me_col, friends_col):
+    def with_column_renamed(self, col_name, new_col_name):
         def f(rows):
             for row in rows:
-                key = row.get(me_col)
-                value = row.get(friends_col)
+                # Replace the key in the dictionary, create new row with that new key.
+                data: dict = row.get_as_dict()
+                assert col_name in data.keys(), "Original Column does not exist!"
+                assert new_col_name not in data.keys(), "Duplicate column!"
 
-                # compute intersection...
-                if len(value) == 1:
-                    intersection = value
-                elif len(value) == 2:
-                    intersection = INTERSECT(value[0], value[1])
-                else:
-                    intersection = INTERSECT(value[0], value[1])
-                    for i in value[1:]:
-                        intersection = INTERSECT(list(intersection), i)
+                data[new_col_name] = data.pop(col_name)
+                yield Row(data)
 
-                logging.debug("Finding Common friends for: " + str(key))
-                yield Row({me_col: key, friends_col: list(intersection)})
+        return self.map_using(f)
+
+    def with_column(self, col_name, func):
+        def f(rows):
+            for row in rows:
+                data: dict = row.get_as_dict()
+                data.update({col_name: func(row)})
+                yield Row(data)
+
+        return self.map_using(f)
+
+    def filter(self, func):
+        def f(rows):
+            for row in rows:
+                should_include = func(row)
+                assert type(should_include) == bool, "Filter function must return a boolean"
+                if should_include:
+                    yield row
 
         df = Dataframe(f)
         df.row_manager._internal_rows = self.row_manager
+
         return df
 
     def limit(self, lim):
-
         def f(rows):
             index = 0
             logging.debug("Getting Rows")

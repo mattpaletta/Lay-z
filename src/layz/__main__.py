@@ -6,13 +6,10 @@ FROM episodes NATURAL JOIN ratings
 WHERE arank > 8.5 AND avotes > 1000 GROUP BY episodeof)
 
 SELECT * FROM productions NATURAL JOIN showEpisodes WHERE attr=‘TV-Show’;
-
 """
-from sql.executor import Executor
-from sql.parser import Parser
-
-# Return create objects.
-from sql.validator import Validator
+from layz.sql.executor import Executor
+from layz.sql.parser import Parser
+from layz.sql.validator import Validator
 
 if __name__ == "__main__":
     parser = Parser()

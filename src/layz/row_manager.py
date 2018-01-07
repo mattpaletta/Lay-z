@@ -1,8 +1,17 @@
 import copy
 
-from Dataframe import is_iterator
-from Row import Row
+from layz.row import Row
 
+def is_iterator(obj):
+    if (
+            hasattr(obj, '__iter__') and
+            (hasattr(obj, 'next') or hasattr(obj, "__next__")) and      # or __next__ in Python 3
+            callable(obj.__iter__) and
+            obj.__iter__() is obj
+        ):
+        return True
+    else:
+        return False
 
 class RowManager(object):
     _internal_rows: [Row]
