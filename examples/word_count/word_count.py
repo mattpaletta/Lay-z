@@ -38,8 +38,8 @@ def count_words(rows):
 pride = "pride_and_prejudice.txt"
 small_test = "small_test.txt"
 
-df = Dataframe()\
-    .read_txt(file_name=small_test, col_name="data")\
-    .map_row(split_by_word).map_using(count_words)
+df = Dataframe()
+df2 = df.read_txt(file_name=small_test, col_name="data")\
+    #.map_row(split_by_word).map_using(count_words)
 
 print(df)

@@ -2,6 +2,7 @@ import itertools
 import parquet
 import csv
 import logging
+import threading
 
 from layz.row import Row
 from layz.row_manager import RowManager
@@ -18,11 +19,12 @@ def isEmpty(iterable):
 
 def INTERSECT(a: list, b: list):
     filtered = filter(lambda x: (x[0] in b and x[1] in a), zip(a, b))
-    return map(lambda x: x[0], filtered)  # flatmap it...
+    return map(lambda x: x[0], filtered)
 
 
 class Dataframe(object):
     row_manager: RowManager
+    prev_row_manager: RowManager = None
 
     def __init__(self, func=None):
         self.row_manager = RowManager()
@@ -31,6 +33,9 @@ class Dataframe(object):
             self.row_manager.func = lambda x: x
         else:
             self.row_manager.func = func
+
+        # create the thread to get new rows...
+        threading.Thread(target=self.__get_new_rows).start()
 
     def __repr__(self):
         self.row_manager.index = 0  # reset pointer...
@@ -71,6 +76,16 @@ class Dataframe(object):
             print(print_str.format(*items))
 
         return ""
+
+    def __get_new_rows(self):
+        # background thread to pull rows from the previous dataframe...
+        # add those new rows into the current row_manager.
+        if self.prev_row_manager is None:
+            return
+
+        for row in self.prev_row_manager:
+            self.row_manager.add_row(row)
+
 
     def add_row(self, data: {str, any}):
         self.row_manager.add_row(data)
@@ -122,8 +137,6 @@ class Dataframe(object):
                 for line in txtfile:
                     yield Row({col_name: line})
 
-                yield StopIteration
-
         return self.map_using(f)
 
 
@@ -139,7 +152,7 @@ class Dataframe(object):
         # Return a new dataframe where the input rows of the dataframe
         # are the output of this dataframe. (after self.func is applied to each row.)
         df = Dataframe(func)
-        df.row_manager._internal_rows = self.row_manager
+        df.prev_row_manager = self.row_manager
 
         return df
 
