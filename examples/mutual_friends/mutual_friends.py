@@ -78,9 +78,13 @@ for key, value in myfriends.items():
     df.add_row(row)
 
 # create a new dataframe after passing in our custom functions.
-df_output = df.map_using(explode_dict)\
-    .map_using(group_friends)\
-    .map_using(find_common_friends)\
-    .limit(100)
+df2 = df.map_using(explode_dict)
+df3 = df2.map_using(group_friends)
+df4 = df3.map_using(find_common_friends)
+df_output = df4.limit(100)
 
+
+print(df2)
+print(df3)
+print(df4)
 print(df_output)

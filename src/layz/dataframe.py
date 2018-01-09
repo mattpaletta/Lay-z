@@ -1,4 +1,6 @@
 import itertools
+from time import sleep
+
 import parquet
 import csv
 import logging
@@ -80,12 +82,22 @@ class Dataframe(object):
     def __get_new_rows(self):
         # background thread to pull rows from the previous dataframe...
         # add those new rows into the current row_manager.
-        if self.prev_row_manager is None:
-            return
 
-        for row in self.prev_row_manager:
-            self.row_manager.add_row(row)
+        while True:
+            sleep(5)
+            if self.row_manager.has_rows():
+                sleep(5)
+                continue
+            logging.debug("Getting input rows from last DF!")
 
+            if self.prev_row_manager is None:
+                return
+
+            for row in self.prev_row_manager:
+                self.row_manager.add_row(row.data)
+
+            if not self.row_manager.getting_more_rows():
+                break
 
     def add_row(self, data: {str, any}):
         self.row_manager.add_row(data)
@@ -139,11 +151,11 @@ class Dataframe(object):
 
         return self.map_using(f)
 
-
     def map_row(self, func):
         def f(rows):
             for row in rows:
-                yield func(row)
+                for item in func(row):
+                    yield item
 
         return self.map_using(f)
 
@@ -186,10 +198,7 @@ class Dataframe(object):
                 if should_include:
                     yield row
 
-        df = Dataframe(f)
-        df.row_manager._internal_rows = self.row_manager
-
-        return df
+        return self.map_using(f)
 
     def limit(self, lim):
         def f(rows):
@@ -203,6 +212,4 @@ class Dataframe(object):
                 if index >= lim:
                     break
 
-        df = Dataframe(f)
-        df.row_manager._internal_rows = self.row_manager
-        return df
+        return self.map_using(f)
