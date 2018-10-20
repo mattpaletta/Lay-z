@@ -1,19 +1,19 @@
 import itertools
+import os
 from time import sleep
-
-import parquet
+import pyarrow.parquet
 import csv
 import logging
 import threading
 
+from group import Group
 from layz.row import Row
-from layz.row_manager import RowManager
 
 
 def isEmpty(iterable):
     my_iter = itertools.islice(iterable, 0)
     try:
-        my_iter.next()
+        next(my_iter)
     except StopIteration:
         return True
     return False
@@ -25,22 +25,16 @@ def INTERSECT(a: list, b: list):
 
 
 class Dataframe(object):
-    row_manager: RowManager
-    prev_row_manager: RowManager = None
 
     def __init__(self, func=None):
-        self.row_manager = RowManager()
+        self.row_manager: [Row] = []
         if func is None:
             # default to the identity function
-            self.row_manager.func = lambda x: x
+            self.func = lambda x: x
         else:
-            self.row_manager.func = func
-
-        # create the thread to get new rows...
-        threading.Thread(target=self.__get_new_rows).start()
+            self.func = func
 
     def __repr__(self):
-        self.row_manager.index = 0  # reset pointer...
         rows = list(self.get_rows())  # evaluate this!
 
         keys = []
@@ -79,28 +73,61 @@ class Dataframe(object):
 
         return ""
 
-    def __get_new_rows(self):
-        # background thread to pull rows from the previous dataframe...
-        # add those new rows into the current row_manager.
+    @staticmethod
+    def from_folder(folder):
+        def f():
+            for file in os.listdir(folder):
+                file_ext = file.split(".")[-1]
+                file_path = os.path.join(folder, file)
 
-        while True:
-            sleep(5)
-            if self.row_manager.has_rows():
-                sleep(5)
-                continue
-            logging.debug("Getting input rows from last DF!")
+                logging.debug("Reading file: {0}".format(file_path))
+                if file_ext == "csv":
+                    yield from Dataframe.from_csv(file_path).get_rows()
+                elif file_ext == "parquet":
+                    yield from Dataframe.from_parquet(file_path).get_rows()
+                elif file_ext == "txt":
+                    yield from Dataframe.read_txt(file_path, col_name = "0").get_rows()
+                else:
+                    logging.warning("Unknown file type: ({0})".format(file_ext))
+        return Dataframe(func = f)
 
-            if self.prev_row_manager is None:
-                return
+    @staticmethod
+    def from_csv(file):
+        def f():
+            with open(file) as csvfile:
+                reader = csv.DictReader(csvfile)
+                yield from reader
+        return Dataframe(func = f)
 
-            for row in self.prev_row_manager:
-                self.row_manager.add_row(row.data)
+    @staticmethod
+    def from_parquet(file, columns = None):
+        def f():
+            if columns is None or len(columns) == 0:
+                yield from pyarrow.parquet.read_table(file)
+            else:
+                yield from pyarrow.parquet.read_table(file, columns = columns)
 
-            if not self.row_manager.getting_more_rows():
-                break
+        return Dataframe(func = f)
 
-    def add_row(self, data: {str, any}):
-        self.row_manager.add_row(data)
+    @staticmethod
+    def from_generator(f):
+        return Dataframe(func = f)
+
+    @staticmethod
+    def with_data(data):
+        def f():
+            yield from data
+        return Dataframe(func = f)
+
+    @staticmethod
+    def read_txt(file_name, col_name):
+        def f():
+            logging.debug("Reading lines!")
+            with open(file_name, "r") as txtfile:
+                for line in txtfile:
+                    yield Row({col_name: line})
+
+        return Dataframe(func = f)
 
     def get_rows(self):
         return self.row_manager
@@ -111,62 +138,32 @@ class Dataframe(object):
             rows.append(row.get_as_dict())
         return rows
 
-    def read_data_multiple(self, files: [str]):
-        for file in files:
-            yield self.read_data(file)
-
-    def read_data(self, file: str):
-        if file.endswith("parquet"):
-            # turn into dataframe _internal_rows.
-            for row in self.__read_parquet(file):
-                # make the conversion from parquet to Row()
-                print(row)
-
-        elif file.endswith("csv"):
-            for row in self.__read_csv(file):
-                print(row)
-
-    def __read_parquet_multiple(self, files):
-        for file in files:
-            for row in self.__read_parquet(file):
-                yield row
-
-    def __read_parquet(self, file):
-        with open(file) as fo:
-            for row in parquet.reader(fo):
-                yield row
-
-    def __read_csv(self, file):
-        with open(file, 'rb') as csvfile:
-            csvreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
-            for row in csvreader:
-                yield row
-
-    def read_txt(self, file_name, col_name):
-        def f(iterator):
-            logging.debug("Reading lines!")
-            with open(file_name, "r") as txtfile:
-                for line in txtfile:
-                    yield Row({col_name: line})
-
-        return self.map_using(f)
-
     def map_row(self, func):
         def f(rows):
             for row in rows:
-                for item in func(row):
-                    yield item
+                yield from func(row)
 
         return self.map_using(f)
-
 
     def map_using(self, func):
         # Return a new dataframe where the input rows of the dataframe
         # are the output of this dataframe. (after self.func is applied to each row.)
-        df = Dataframe(func)
-        df.prev_row_manager = self.row_manager
+        self.func = map(lambda x: func(x), self.func)
+        return self
 
-        return df
+    def add_row(self, row: Row):
+        def f():
+            yield from self.func
+            yield row
+        self.func = f
+        return self
+
+    def add_rows(self, rows: [Row]):
+        def f():
+            yield from self.func
+            yield from rows
+        self.func = f
+        return self
 
     def with_column_renamed(self, col_name, new_col_name):
         def f(rows):
@@ -205,11 +202,23 @@ class Dataframe(object):
             index = 0
             logging.debug("Getting Rows")
             for item in rows:
-                logging.debug("Reached Limit!")
-                index += 1
                 yield item
+                index += 1
 
                 if index >= lim:
-                    break
-
+                    raise StopIteration
         return self.map_using(f)
+
+    def group_by_key(self, key):
+        def f():
+            groups = {}
+            for item in self.func:
+                assert key in item.keys(), "Column not found in row"
+                if key in groups.keys():
+                    groups[key].append(item)
+                else:
+                    groups.update({key, [item]})
+
+            for group, values in groups.items():
+                yield Group(group = group,
+                            rows = values)
