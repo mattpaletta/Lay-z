@@ -1,6 +1,6 @@
 import os
 
-from sql.parser import SELECT, TABLE, COLUMN, INSERT, CREATE, SCHEMA
+from layz.sql.parser import SELECT, TABLE, COLUMN, INSERT, CREATE, SCHEMA
 
 
 class Validator(object):

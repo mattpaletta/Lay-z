@@ -1,12 +1,10 @@
 import itertools
 import os
-from time import sleep
 import pyarrow.parquet
 import csv
 import logging
-import threading
 
-from group import Group
+from layz.group import Group
 from layz.row import Row
 
 

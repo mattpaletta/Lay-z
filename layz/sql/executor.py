@@ -1,5 +1,5 @@
 # turn the parsed SQL into function calls.
-from sql.parser import SCHEMA, CREATE
+from layz.sql.parser import SCHEMA, CREATE
 
 
 class Executor(object):
