@@ -22,7 +22,7 @@ class Validator(object):
                 select: SELECT = item
                 is_valid = is_valid and len(select.columns) > 0
                 is_valid = is_valid and select.tbl is not None and select.tbl is not ""
-                tbl:TABLE = select.tbl
+                tbl: TABLE = select.tbl
                 is_valid = is_valid and tbl.schema is not None and tbl.schema is not ""
                 is_valid = is_valid and select.order in ["ASC", "DESC", None]
 
